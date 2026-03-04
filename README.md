@@ -27,7 +27,7 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 Clone the repository:
 
-git clone [https://github.com/your-username/rubrik-threat-simulator.git](https://github.com/your-username/rubrik-threat-simulator.git)
+git clone https://github.com/shane-rubrik/GenerateThreatFile/blob/main/GenerateThreatFile.ps1
 
 
 Navigate to the directory:
