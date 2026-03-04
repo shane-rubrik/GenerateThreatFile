@@ -51,14 +51,19 @@ Generate files and automatically tell Rubrik to look for them in your backups:
 .\GenerateThreatFile.ps1 -RubrikConfigPath "C:\creds\rsc-sa.json" -CreateThreatFeed -Count 5
 
 
-3. Network Distribution
+3. Example with custom paths:
+
+.\GenerateThreatFile.ps1 -Count 1 -OutputDirectory c:\temp -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed
+
+
+4. Network Distribution
 
 Simulate files spreading to servers via UNC paths:
 
 .\GenerateThreatFile.ps1 -Count 1 -NetworkPaths "\\FS01\Public", "\\FS02\Backups"
 
 
-4. Cleanup
+5. Cleanup
 
 Wipe all traces of the lab in the target directory:
 
