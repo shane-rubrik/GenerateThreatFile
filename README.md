@@ -41,33 +41,33 @@ cd rubrik-threat-simulator
 
 Create 10 fake malware files in a specific folder:
 
-.\GenerateThreatFile.ps1 -Count 10 -OutputDirectory "C:\SafetyLab"
+```.\GenerateThreatFile.ps1 -Count 10 -OutputDirectory "C:\SafetyLab"```
 
 
 2. Full Simulation with Rubrik RSC
 
 Generate files and automatically tell Rubrik to look for them in your backups:
 
-.\GenerateThreatFile.ps1 -RubrikConfigPath "C:\creds\rsc-sa.json" -CreateThreatFeed -Count 5
+```.\GenerateThreatFile.ps1 -RubrikConfigPath "C:\creds\rsc-sa.json" -CreateThreatFeed -Count 5```
 
 
 3. Example with custom paths:
 
-.\GenerateThreatFile.ps1 -Count 1 -OutputDirectory c:\temp -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed
+```.\GenerateThreatFile.ps1 -Count 1 -OutputDirectory c:\temp -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed```
 
 
 4. Network Distribution
 
 Simulate files spreading to servers via UNC paths:
 
-.\GenerateThreatFile.ps1 -Count 1 -NetworkPaths "\\FS01\Public", "\\FS02\Backups"
+```.\GenerateThreatFile.ps1 -Count 1 -NetworkPaths "\\FS01\Public", "\\FS02\Backups"```
 
 
 5. Cleanup
 
 Wipe all traces of the lab in the target directory:
 
-.\GenerateThreatFile.ps1 -OutputDirectory "C:\SafetyLab" -Cleanup
+```.\GenerateThreatFile.ps1 -OutputDirectory "C:\SafetyLab" -Cleanup```
 
 
 🔒 Security Note
