@@ -20,7 +20,7 @@ Rubrik Security Cloud Account: To use the API integration, you need a Service Ac
 
 Permissions: Execution policy must allow local scripts:
 
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
 
 📥 Installation
