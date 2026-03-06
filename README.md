@@ -10,7 +10,7 @@ RSC Integration: Automatically connects to your Rubrik Security Cloud instance t
 
 Lateral Movement Simulation: Automatically distributes files to multiple network shares or local directories.
 
-Auto-Cleanup: A single command wipes the simulation environment, deleting generated files and local logs.
+Full Lifecycle Cleanup: A single command wipes the simulation environment, deleting local files, logs, and automatically removing the Intel Threat Source from Rubrik.
 
 🛠 Prerequisites
 
@@ -63,11 +63,11 @@ Simulate files spreading to servers via UNC paths:
 ```.\GenerateThreatFile.ps1 -Count 1 -NetworkPaths "\\FS01\Public", "\\FS02\Backups"```
 
 
-5. Cleanup
+5. Full Cleanup (Local & Rubrik)
 
-Wipe all traces of the lab in the target directory:
+Wipe local files and automatically remove the Threat Source from Rubrik:
 
-```.\GenerateThreatFile.ps1 -OutputDirectory "C:\SafetyLab" -Cleanup```
+```.\GenerateThreatFile.ps1 -OutputDirectory "c:\temp" -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -Cleanup```
 
 
 🔒 Security Note
