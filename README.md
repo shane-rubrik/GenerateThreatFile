@@ -1,79 +1,122 @@
-Rubrik Threat Hunting Simulator
+# Rubrik Threat Hunting Simulator
 
 This PowerShell tool is designed for cybersecurity professionals to safely simulate a malware outbreak. It generates harmless, randomized executable files that look "suspicious" to security scanners, allowing you to test detection pipelines and Rubrik Security Cloud (RSC) Threat Hunting features.
 
-🚀 Features
+---
 
-Harmless PE Generation: Creates valid .exe file headers with randomized content so every file has a unique SHA256 signature.
+## 🚀 Features
 
-RSC Integration: Automatically connects to your Rubrik Security Cloud instance to create custom Threat Feeds based on the generated files.
+- **Realistic PE Generation:** Creates executable files with a full DOS header, DOS stub, PE signature, and randomized timestamp — giving every file a unique SHA256 signature.
+- **RSC Integration:** Connects to your Rubrik Security Cloud instance to create custom Threat Feeds based on the generated file hashes.
+- **Lateral Movement Simulation:** Distributes files to multiple network shares or local directories to simulate spreading malware.
+- **Session Tracking:** Each run is assigned an iteration number. Re-running the script increments from the previous session, maintaining a continuous log.
+- **Full Lifecycle Cleanup:** A single command wipes the simulation — deleting local files, network copies, the tracking log, and automatically removing the Intel Threat Source from Rubrik.
 
-Lateral Movement Simulation: Automatically distributes files to multiple network shares or local directories.
+---
 
-Full Lifecycle Cleanup: A single command wipes the simulation environment, deleting local files, logs, and automatically removing the Intel Threat Source from Rubrik.
+## 🛠 Prerequisites
 
-🛠 Prerequisites
+- **PowerShell 5.1 or 7+**
+- **Rubrik Security Cloud Account:** A Service Account JSON credentials file is required for RSC API integration.
+- **Execution Policy:** Must allow local scripts:
 
-PowerShell 5.1 or 7+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
-Rubrik Security Cloud Account: To use the API integration, you need a Service Account JSON credentials file.
+---
 
-Permissions: Execution policy must allow local scripts:
-
-`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
-
-
-📥 Installation
+## 📥 Installation
 
 Clone the repository:
 
-git clone https://github.com/shane-rubrik/GenerateThreatFile/blob/main/GenerateThreatFile.ps1
-
+```powershell
+git clone https://github.com/shane-rubrik/GenerateThreatFile
+```
 
 Navigate to the directory:
 
-cd rubrik-threat-simulator
+```powershell
+cd GenerateThreatFile
+```
 
+---
 
-📖 Usage Examples
+## 📖 Parameters
 
-1. Simple Local Generation
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `-OutputDirectory` | String | No | Folder where files are created. Defaults to a `Threats` subfolder next to the script. |
+| `-Count` | Int | No | Number of files to generate. Defaults to `1`. |
+| `-RubrikConfigPath` | String | No | Path to your RSC Service Account JSON credentials file. |
+| `-CreateThreatFeed` | Switch | No | When present, uploads generated hashes to RSC as a custom Threat Feed. Requires `-RubrikConfigPath`. |
+| `-NetworkPaths` | String[] | No | One or more UNC paths to copy files to (e.g. `"\\FS01\Share"`). |
+| `-Cleanup` | Switch | No | Deletes all generated files (local and network), removes the tracking CSV, and removes the Threat Source from Rubrik. |
+
+---
+
+## 📖 Usage Examples
+
+### 1. Simple Local Generation
 
 Create 10 fake malware files in a specific folder:
 
-```.\GenerateThreatFile.ps1 -Count 10 -OutputDirectory "C:\SafetyLab"```
+```powershell
+.\GenerateThreatFile.ps1 -Count 10 -OutputDirectory "C:\SafetyLab"
+```
 
+### 2. Full Simulation with Rubrik RSC
 
-2. Full Simulation with Rubrik RSC
+Generate files and create a Threat Feed in Rubrik so it scans your backups for the hashes:
 
-Generate files and automatically tell Rubrik to look for them in your backups:
+```powershell
+.\GenerateThreatFile.ps1 -Count 5 -OutputDirectory "C:\temp" -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed
+```
 
-```.\GenerateThreatFile.ps1 -RubrikConfigPath "C:\creds\rsc-sa.json" -CreateThreatFeed -Count 5```
-
-
-3. Example with custom paths:
-
-```.\GenerateThreatFile.ps1 -Count 1 -OutputDirectory c:\temp -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed```
-
-
-4. Network Distribution
+### 3. Network Distribution
 
 Simulate files spreading to servers via UNC paths:
 
-```.\GenerateThreatFile.ps1 -Count 1 -NetworkPaths "\\FS01\Public", "\\FS02\Backups"```
+```powershell
+.\GenerateThreatFile.ps1 -Count 3 -NetworkPaths "\\FS01\Public", "\\FS02\Backups" -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -CreateThreatFeed
+```
 
+### 4. Full Cleanup (Local & Rubrik)
 
-5. Full Cleanup (Local & Rubrik)
+Wipe all generated files, network copies, and remove the Threat Source from Rubrik:
 
-Wipe local files and automatically remove the Threat Source from Rubrik:
+```powershell
+.\GenerateThreatFile.ps1 -OutputDirectory "C:\temp" -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -Cleanup
+```
 
-```.\GenerateThreatFile.ps1 -OutputDirectory "c:\temp" -RubrikConfigPath "C:\scripts\json\rsc-sa.json" -Cleanup```
+---
 
+## 📋 Tracking Log (CSV)
 
-🔒 Security Note
+Every run appends to `generated_executables.csv` in the output directory. The log includes:
+
+| Column | Description |
+|---|---|
+| `Iteration` | Auto-incrementing run number across sessions |
+| `ThreatFeed` | Name of the RSC Threat Feed the hashes were added to |
+| `FileName` | Generated filename |
+| `FullPath` | Full local path to the file |
+| `SHA256` | SHA256 hash of the file |
+| `Size` | File size in bytes |
+| `Created` | File creation timestamp |
+| `ProviderId` | RSC Threat Feed provider ID |
+| `NetworkPaths` | Semicolon-separated list of network paths the file was copied to |
+
+The `-Cleanup` switch uses this log to locate and delete every file, including remote copies.
+
+---
+
+## 🔒 Security Note
 
 The files generated by this script contain no malicious code. They consist of a standard Windows executable header followed by random junk data. They will not run or execute any instructions, but their presence will trigger security tools that monitor for unknown executables or specific Indicators of Compromise (IoCs).
 
-📄 License
+---
 
-This project is licensed under the MIT License - see the LICENSE file for details
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
