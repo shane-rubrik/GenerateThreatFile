@@ -104,10 +104,65 @@ function Remove-RubrikThreatFeed {
 # SECTION 3: FILE GENERATION
 # ---------------------------------------------------------
 
+function Get-RandomString {
+    param([int]$Length = 10)
+    $chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    return -join ((1..$Length) | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
+}
+
+function Get-CurrentIteration {
+    param([string]$CsvPath)
+    if (Test-Path $CsvPath) {
+        try {
+            $existingData = Import-Csv $CsvPath -ErrorAction SilentlyContinue
+            if ($existingData -and $existingData.Count -gt 0) {
+                $lastIteration = ($existingData | Measure-Object -Property Iteration -Maximum).Maximum
+                return [int]$lastIteration + 1
+            }
+        } catch {
+            Write-Warning "Could not read existing CSV file. Starting from iteration 1."
+        }
+    }
+    return 1
+}
+
 function New-MinimalExecutable {
     param([string]$FilePath)
     try {
-        $peHeader = @(0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00)
+        $peHeader = @(
+            # DOS Header
+            0x4D, 0x5A,             # MZ signature
+            0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00,
+            0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00,
+
+            # DOS Stub (minimal)
+            0x0E, 0x1F, 0xBA, 0x0E, 0x00, 0xB4, 0x09, 0xCD, 0x21, 0xB8, 0x01, 0x4C, 0xCD, 0x21,
+            0x54, 0x68, 0x69, 0x73, 0x20, 0x70, 0x72, 0x6F, 0x67, 0x72, 0x61, 0x6D, 0x20, 0x63,
+            0x61, 0x6E, 0x6E, 0x6F, 0x74, 0x20, 0x62, 0x65, 0x20, 0x72, 0x75, 0x6E, 0x20, 0x69,
+            0x6E, 0x20, 0x44, 0x4F, 0x53, 0x20, 0x6D, 0x6F, 0x64, 0x65, 0x2E, 0x0D, 0x0D, 0x0A,
+            0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+            # PE Header
+            0x50, 0x45, 0x00, 0x00, # PE signature
+            0x4C, 0x01,             # Machine (i386)
+            0x01, 0x00,             # Number of sections
+            0x00, 0x00, 0x00, 0x00, # Timestamp (randomized below)
+            0x00, 0x00, 0x00, 0x00, # Pointer to symbol table
+            0x00, 0x00, 0x00, 0x00, # Number of symbols
+            0xE0, 0x00,             # Size of optional header
+            0x02, 0x01              # Characteristics
+        )
+
+        # Randomize the PE timestamp
+        $unixEpoch = [DateTime]::new(1970, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
+        $timestamp = [BitConverter]::GetBytes([uint32](([DateTime]::UtcNow - $unixEpoch).TotalSeconds))
+        $peHeader[136] = $timestamp[0]
+        $peHeader[137] = $timestamp[1]
+        $peHeader[138] = $timestamp[2]
+        $peHeader[139] = $timestamp[3]
+
         $randomBytes = New-Object byte[] (Get-Random -Minimum 2048 -Maximum 8192)
         (New-Object System.Random).NextBytes($randomBytes)
         [System.IO.File]::WriteAllBytes($FilePath, ([byte[]]$peHeader + $randomBytes))
@@ -149,7 +204,13 @@ if ($Cleanup) {
             }
 
             foreach ($item in $data) {
-                if (Test-Path $item.Path) { Remove-Item $item.Path -Force -ErrorAction SilentlyContinue }
+                if (Test-Path $item.FullPath) { Remove-Item $item.FullPath -Force -ErrorAction SilentlyContinue }
+                if ($item.NetworkPaths) {
+                    $item.NetworkPaths -split ';' | Where-Object { $_.Trim() -ne "" } | ForEach-Object {
+                        $networkFilePath = Join-Path $_.Trim() $item.FileName
+                        if (Test-Path $networkFilePath) { Remove-Item $networkFilePath -Force -ErrorAction SilentlyContinue }
+                    }
+                }
             }
         } catch {
             Write-Host "⚠ Note: Could not complete cleanup ($($_.Exception.Message))" -ForegroundColor Yellow
@@ -159,7 +220,7 @@ if ($Cleanup) {
     if (Test-Path $targetDir) {
         # Catch any generated files not recorded in the CSV
         Get-ChildItem -Path $targetDir -Filter "*.exe" |
-            Where-Object { $_.Name -match "^[A-Z]{10}\.exe$" } |
+            Where-Object { $_.Name -match "^[A-Za-z0-9]{8,14}\.exe$" } |
             ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
 
         if (Test-Path $csvPath) {
@@ -175,6 +236,7 @@ if (-not (Test-Path $targetDir)) { New-Item -Path $targetDir -ItemType Directory
 
 $rubrikConnection = $null
 $providerId       = ""
+$currentIteration = Get-CurrentIteration -CsvPath $csvPath
 
 if ($RubrikConfigPath) {
     try {
@@ -190,31 +252,49 @@ $batchData = [System.Collections.Generic.List[hashtable]]::new()
 $hashes    = [System.Collections.Generic.List[string]]::new()
 
 for ($i = 1; $i -le $Count; $i++) {
+    $iterationNumber = $currentIteration + ($i - 1)
+
     # Retry on the rare chance of a name collision
     do {
-        $fileName = "$( -join ((1..10) | ForEach-Object { "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[(Get-Random -Max 26)] }) ).exe"
+        $fileName = "$(Get-RandomString -Length (Get-Random -Minimum 8 -Maximum 15)).exe"
         $fullPath = Join-Path $targetDir $fileName
     } while (Test-Path $fullPath)
 
     if (New-MinimalExecutable -FilePath $fullPath) {
-        $hash = (Get-FileHash $fullPath -Algorithm SHA256).Hash
+        $hash         = (Get-FileHash $fullPath -Algorithm SHA256).Hash
+        $fileSize     = (Get-Item $fullPath).Length
+        $creationTime = (Get-Item $fullPath).CreationTime
         $hashes.Add($hash)
-        $batchData.Add(@{ FileName = $fileName; Path = $fullPath; Hash = $hash })
-        Write-Host "Created: $fileName" -ForegroundColor Green
 
+        $networkPathsString = ""
         if ($NetworkPaths) {
+            $successfulPaths = @()
             foreach ($netPath in $NetworkPaths) {
                 try {
                     Copy-Item -Path $fullPath -Destination $netPath -Force -ErrorAction Stop
                     Write-Host "  Copied to: $netPath" -ForegroundColor Gray
+                    $successfulPaths += $netPath
                 } catch {
                     Write-Host "  ⚠ Could not copy to ${netPath}: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
             }
+            if ($successfulPaths.Count -gt 0) { $networkPathsString = $successfulPaths -join ';' }
         }
+
+        $batchData.Add(@{
+            Iteration    = $iterationNumber
+            FileName     = $fileName
+            FullPath     = $fullPath
+            Hash         = $hash
+            Size         = $fileSize
+            Created      = $creationTime
+            NetworkPaths = $networkPathsString
+        })
+        Write-Host "Created: $fileName" -ForegroundColor Green
     }
 }
 
+$feedName = ""
 if ($rubrikConnection -and $CreateThreatFeed -and $hashes.Count -gt 0) {
     Write-Host "Uploading Threat Feed to RSC..." -ForegroundColor Cyan
     $feedName = "Lab-Threat-$(Get-Date -Format 'yyyyMMdd-HHmm')"
@@ -227,11 +307,15 @@ if ($rubrikConnection -and $CreateThreatFeed -and $hashes.Count -gt 0) {
 
 $batchData | ForEach-Object {
     [PSCustomObject]@{
-        Time       = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        FileName   = $_.FileName
-        SHA256     = $_.Hash
-        Path       = $_.Path
-        ProviderId = $providerId
+        Iteration    = $_.Iteration
+        ThreatFeed   = $feedName
+        FileName     = $_.FileName
+        FullPath     = $_.FullPath
+        SHA256       = $_.Hash
+        Size         = $_.Size
+        Created      = $_.Created
+        ProviderId   = $providerId
+        NetworkPaths = $_.NetworkPaths
     }
 } | Export-Csv $csvPath -Append -NoTypeInformation
 
