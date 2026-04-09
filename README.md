@@ -16,7 +16,7 @@ This PowerShell tool is designed for cybersecurity professionals to safely simul
 
 ## 🛠 Prerequisites
 
-- **PowerShell 5.1 or 7+**
+- **PowerShell 7+**
 - **Rubrik Security Cloud Account:** A Service Account JSON credentials file is required for RSC API integration.
 - **Execution Policy:** Must allow local scripts:
 
